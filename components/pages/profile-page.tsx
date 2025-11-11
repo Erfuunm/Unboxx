@@ -3,188 +3,226 @@
 
 import { useEffect, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase-client'
+import { toast } from 'sonner'
+import { User, Mail, Phone, Badge, Save } from 'lucide-react'
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const supabase = createSupabaseBrowserClient()
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setError(null)
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError || !user) {
-        setError('Not authenticated')
-        setLoading(false)
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('Profile')
-        .select('*')
-        .eq('auth', user.id)
-        .maybeSingle() // ← IMPORTANT: allows null result without error
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Select error:', error)
-        setError('Failed to load profile. Please try again.')
-        setLoading(false)
-        return
-      }
-
-      if (data) {
-        setProfile(data)
-      } else {
-        // No profile → ready to create
-        setProfile({
-          auth: user.id,
-          email: user.email || '',
-          first_name: '',
-          surname: '',
-          phone: '',
-          role: 'client'
-        })
-      }
+  const fetchProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) {
+      toast.error('Authentication required')
       setLoading(false)
+      return
     }
 
+    const { data, error } = await supabase
+      .from('Profile')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle()
+
+    if (error && error.code !== 'PGRST116') {
+      toast.error('Failed to load profile')
+      setLoading(false)
+      return
+    }
+
+    if (data) {
+      setProfile(data)
+    } else {
+      setProfile({
+        id: user.id,
+        auth: user.id,
+        email: user.email,
+        first_name: '',
+        surname: '',
+        phone: '',
+        role: 'client'
+      })
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
     fetchProfile()
-  }, [supabase])
+  }, [])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!profile) return
 
     setSaving(true)
-    setError(null)
-
     const payload = {
-      auth: profile.auth,
-      email: profile.email,
-      first_name: profile.first_name || '',
-      surname: profile.surname || '',
-      phone: profile.phone || '',
-      role: profile.role || 'client'
+      first_name: profile.first_name?.trim() || null,
+      surname: profile.surname?.trim() || null,
+      phone: profile.phone?.trim() || null,
+      email: profile.email
     }
 
-    const { data, error } = profile.id
-      ? await supabase.from('Profile').update(payload).eq('auth', profile.auth).select().single()
-      : await supabase.from('Profile').insert(payload).select().single()
+    let response
+    if (profile.id) {
+      response = await supabase
+        .from('Profile')
+        .update(payload)
+        .eq('email', profile.email)
+    } else {
+      response = await supabase
+        .from('Profile')
+        .insert({
+          id: profile.id,
+          auth: profile.id,
+          email: profile.email,
+          role: 'client',
+          ...payload
+        })
+        .select()
+    }
 
     setSaving(false)
 
-    if (error) {
-      console.error('Save error:', error)
-      setError(
-        error.code === '42501'
-          ? 'Permission denied. Please contact admin.'
-          : error.message || 'Failed to save profile'
-      )
+    if (response.error) {
+      toast.error(response.error.message || 'Failed to save profile')
     } else {
-      setProfile(data)
-      alert('Profile saved successfully!')
+      await fetchProfile()
+      toast.success(profile.id ? 'Profile updated!' : 'Welcome! Profile created!')
     }
   }
 
   if (loading) {
     return (
-      <div className="p-8 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        <p className="mt-4">Loading profile...</p>
+      <div className="p-8 max-w-2xl mx-auto">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-8"></div>
+          <div className="space-y-6 bg-white p-8 rounded-xl shadow-lg">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-10 bg-gray-100 rounded"></div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-8" style={{ color: "#192216" }}>
-        {profile?.id ? 'Edit Profile' : 'Complete Your Profile'}
-      </h1>
+    <div className="p-6 md:p-8 max-w-3xl mx-auto">
+      {/* Header */}
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-md">
-          {error}
-        </div>
-      )}
 
-      <form onSubmit={handleSave} className="space-y-6 bg-white p-8 rounded-lg shadow">
-        <div>
-          <label className="block text-sm font-medium mb-2">Email</label>
-          <input
-            type="email"
-            value={profile.email || ''}
-            disabled
-            className="w-full px-4 py-2 border rounded-md bg-gray-50"
-            style={{ borderColor: "#E0E0D4" }}
-          />
+      {/* Form Card */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 px-8 py-5">
+          <h2 className="text-xl font-semibold text-white flex items-center gap-3">
+            <User className="w-6 h-6" />
+            Personal Information
+          </h2>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">First Name *</label>
-          <input
-            type="text"
-            value={profile.first_name || ''}
-            onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
-            required
-            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-            style={{ borderColor: "#E0E0D4" }}
-            placeholder="John"
-          />
-        </div>
+        <form onSubmit={handleSave} className="p-8 space-y-7">
+          {/* Email */}
+          <div className="group">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+              <Mail className="w-4 h-4 text-emerald-600" />
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={profile.email || ''}
+              disabled
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Surname *</label>
-          <input
-            type="text"
-            value={profile.surname || ''}
-            onChange={(e) => setProfile({ ...profile, surname: e.target.value })}
-            required
-            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-            style={{ borderColor: "#E0E0D4" }}
-            placeholder="Doe"
-          />
-        </div>
+          {/* First Name */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                First Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={profile.first_name || ''}
+                onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+                required
+                placeholder="John"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Phone</label>
-          <input
-            type="text"
-            value={profile.phone || ''}
-            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-            className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-            style={{ borderColor: "#E0E0D4" }}
-            placeholder="+994 50 123 45 67"
-          />
-        </div>
+            {/* Surname */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                Surname <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={profile.surname || ''}
+                onChange={(e) => setProfile({ ...profile, surname: e.target.value })}
+                required
+                placeholder="Doe"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+              />
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Role</label>
-          <input
-            type="text"
-            value={profile.role || 'client'}
-            disabled
-            className="w-full px-4 py-2 border rounded-md bg-gray-50"
-            style={{ borderColor: "#E0E0D4" }}
-          />
-        </div>
+          {/* Phone */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+              <Phone className="w-4 h-4 text-emerald-600" />
+              Phone Number
+            </label>
+            <input
+              type="text"
+              value={profile.phone || ''}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              placeholder="+994 50 123 45 67"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+            />
+          </div>
 
-        <div className="pt-4">
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full py-3 rounded-md font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: "#192216" }}
-          >
-            {saving ? 'Saving...' : profile?.id ? 'Update Profile' : 'Create Profile'}
-          </button>
-        </div>
-      </form>
+          {/* Role */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+              <Badge className="w-4 h-4 text-emerald-600" />
+              Account Role
+            </label>
+            <div className="px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl font-medium text-emerald-800">
+              {profile.role === 'admin' ? 'Administrator' : 'Client User'}
+            </div>
+          </div>
 
+          {/* Submit Button */}
+          <div className="pt-6">
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all duration-300 flex items-center justify-center gap-3
+                bg-gradient-to-r from-emerald-600 to-teal-700 
+                hover:from-emerald-700 hover:to-teal-800 
+                active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+              style={{ background: saving ? '#ccc' : 'linear-gradient(to right, #192216, #0d4f3d)' }}
+            >
+              {saving ? (
+                <>Saving...</>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  {profile?.id ? 'Update Profile' : 'Create Profile'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Footer Note */}
       {!profile?.id && (
-        <p className="mt-6 text-sm text-gray-600 text-center">
-          This is your first time here. Please complete your profile to continue.
+        <p className="text-center text-sm text-gray-500 mt-8 italic">
+          This is your first time here — welcome to Unboxx Portal!
         </p>
       )}
     </div>
