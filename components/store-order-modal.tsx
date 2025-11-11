@@ -8,7 +8,6 @@ import {
   Phone,
   MapPin,
   Package,
-  ShoppingCart,
 } from "lucide-react";
 
 interface StoreOrderModalProps {
@@ -107,7 +106,7 @@ export default function StoreOrderModal({ order, isOpen, onClose }: StoreOrderMo
                 </div>
               </div>
             </div>
-            {/* Customer Details */}
+            
             <div className="bg-white p-6 rounded-lg" style={{ backgroundColor: "#FFFFFF" }}>
               <h3 className="font-bold text-lg mb-4" style={{ color: "#192216" }}>
                 Customer Details
@@ -119,6 +118,7 @@ export default function StoreOrderModal({ order, isOpen, onClose }: StoreOrderMo
                     <p className="text-gray-600 text-sm">Customer Name</p>
                     <p className="font-semibold" style={{ color: "#192216" }}>
                       {order.customer}
+                    
                     </p>
                   </div>
                 </div>

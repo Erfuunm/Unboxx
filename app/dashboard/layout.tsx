@@ -1,25 +1,22 @@
-"use client"
+// app/dashboard/layout.tsx
+import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { redirect } from 'next/navigation'
+import DashboardClient from './DashboardClient'
 
-import type React from "react"
-
-import { useState } from "react"
-import Sidebar from "@/components/sidebar"
-import Header from "@/components/header"
-
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const supabase = await createSupabaseServerClient()
 
-  return (
-    <div className="flex h-screen" style={{ backgroundColor: "#D4D4C8" }}>
-      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
-      </div>
-    </div>
-  )
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  return <DashboardClient>{children}</DashboardClient>
 }
