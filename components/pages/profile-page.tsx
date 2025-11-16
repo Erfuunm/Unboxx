@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase-client'
 import { toast } from 'sonner'
-import { User, Mail, Phone, Badge, Building2, Edit3 } from 'lucide-react'
+import { User, Mail, Phone, Building2, Edit3 } from 'lucide-react'
 import CompanyModal from '@/components/modals/CompanyModal'
 import ProfileModal from '@/components/modals/ProfileModal'
 
@@ -26,31 +26,38 @@ export default function ProfilePage() {
   const supabase = createSupabaseBrowserClient()
 
   const fetchData = async () => {
+    setLoading(true)
+
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.email) {
+    if (!user) {
       toast.error('Login required')
       setLoading(false)
       return
     }
 
-    const { data: profileData } = await supabase
+    const { data: profileData, error } = await supabase
       .from('Profile')
       .select('*')
-      .eq('email', user.email)
+      .eq('id', user.id)
       .single()
 
-    if (profileData) {
-      setProfile(profileData)
-
-      if (profileData.customer_id) {
-        const { data: cust } = await supabase
-          .from('Customer')
-          .select('*')
-          .eq('id', profileData.customer_id)
-          .single()
-        setCustomer(cust)
-      }
+    if (error || !profileData) {
+      toast.error('Profile not found')
+      setLoading(false)
+      return
     }
+
+    setProfile(profileData)
+
+    if (profileData.customer_id) {
+      const { data: cust } = await supabase
+        .from('Customer')
+        .select('*')
+        .eq('id', profileData.customer_id)
+        .single()
+      setCustomer(cust)
+    }
+
     setLoading(false)
   }
 
